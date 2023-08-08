@@ -21,7 +21,7 @@
 void test_query() {
   std::string str =
       "{\"type\": 1, \"lower\": 5, \"upper\": 9, \"column\": \"val\"}";
-  auto expr = swallow_query::parse(str.c_str(), str.size());
+  auto expr = disgorge::parse(str.c_str(), str.size());
   std::string doc = "{\"val\": 4}";
   rapidjson::Document d;
   d.Parse(doc.c_str());

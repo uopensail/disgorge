@@ -1,0 +1,37 @@
+syntax = "proto3";
+option go_package = "./;api";
+package api;
+
+enum ShardStatus {
+  Error = 0;
+  NotStarted = 1;
+  InProgress = 2;
+  Finished = 3;
+}
+
+message Shard {
+  string path = 1;
+  string lastkey = 2;
+  bool hasMore = 3;
+  ShardStatus status = 4;
+}
+
+message Request {
+  string userId = 1;
+  string query = 2;
+  int64 start = 3;
+  int64 end = 4;
+  repeated Shard shards = 5;
+}
+
+message Data { repeated string items = 1; }
+
+message Response {
+  int32 code = 1;
+  repeated Shard shards = 2;
+  repeated Data data = 3;
+}
+
+service DisgorgeService {
+  rpc Query(Request) returns (Response) {}
+}

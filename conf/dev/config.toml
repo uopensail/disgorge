@@ -1,0 +1,7 @@
+debug = true
+grpc_port = 9527
+http_port = 9528
+log_dir = "/tmp"
+project_name = "disgorge"
+prome_port = 9529
+work_dir = '/tmp/'

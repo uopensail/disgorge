@@ -1,5 +1,5 @@
 //
-// `swallow` - 'trace log storage for recommender system'
+// `disgorge` - 'trace log querier for recommender system'
 // Copyright (C) 2019 - present timepi <timepi123@gmail.com>
 // LuBan is provided under: GNU Affero General Public License (AGPL3.0)
 // https://www.gnu.org/licenses/agpl-3.0.html unless stated otherwise.
@@ -13,15 +13,15 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Affero General Public License for more details.
 //
-#ifndef SWALLOW_QUERY_HPP
-#define SWALLOW_QUERY_HPP
+#ifndef DISGORGE_QUERY_HPP
+#define DISGORGE_QUERY_HPP
 
 #include <rapidjson/document.h>
 
 #include <string>
 #include <type_traits>
 
-namespace swallow_query {
+namespace disgorge {
 enum Type : int {
   kNilType,
   kBetweenIntType,
@@ -566,6 +566,6 @@ static std::shared_ptr<Boolean> parse(const char *json, size_t len) {
   return parse_from_value(document);
 }
 
-};  // namespace swallow_query
+};  // namespace disgorge
 
-#endif  // SWALLOW_QUERY_HPP
+#endif  // DISGORGE_QUERY_HPP

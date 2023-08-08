@@ -1,2 +1,2 @@
 # disgorge
-trace log queries
+trace log querier

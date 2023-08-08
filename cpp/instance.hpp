@@ -1,5 +1,5 @@
 //
-// `swallow` - 'trace log storage for recommender system'
+// `disgorge` - 'trace log querier for recommender system'
 // Copyright (C) 2019 - present timepi <timepi123@gmail.com>
 // LuBan is provided under: GNU Affero General Public License (AGPL3.0)
 // https://www.gnu.org/licenses/agpl-3.0.html unless stated otherwise.
@@ -14,8 +14,8 @@
 // GNU Affero General Public License for more details.
 //
 
-#ifndef SWALLOW_INSTANCE_HPP
-#define SWALLOW_INSTANCE_HPP
+#ifndef DISGORGE_INSTANCE_HPP
+#define DISGORGE_INSTANCE_HPP
 
 #pragma once
 
@@ -29,7 +29,7 @@
 
 #include "query.hpp"
 
-namespace swallow {
+namespace disgorge {
 
 const size_t max_count = 1000;
 
@@ -37,15 +37,15 @@ class Instance;
 
 class Response {
  public:
-  Response() : more_(false), lastkey_("") {}
+  Response() : more_(0), lastkey_("") {}
   ~Response() = default;
-  bool more() { return more_; }
+  int more() { return more_; }
   size_t size() { return data_.size(); }
   const std::string &lastkey() { return lastkey_; }
   const std::string &operator[](size_t i) const { return data_[i]; }
 
  private:
-  bool more_;
+  int more_;
   std::string lastkey_;
   std::vector<std::string> data_;
   friend class Instance;
@@ -75,7 +75,7 @@ class Instance {
 
   Response *scan(rocksdb::Slice query, rocksdb::Slice start,
                  rocksdb::Slice end) {
-    auto expr = swallow_query::parse(query.data(), query.size());
+    auto expr = disgorge::parse(query.data(), query.size());
     Response *resp = new Response();
     const rocksdb::Snapshot *sp = db_->GetSnapshot();
     rocksdb::ReadOptions options;
@@ -105,7 +105,7 @@ class Instance {
             std::string{it->value().data(), it->value().size()});
         count++;
         if (count >= max_count) {
-          resp->more_ = true;
+          resp->more_ = 1;
           resp->lastkey_ = std::string{it->key().data(), it->key().size()};
           break;
         }
@@ -119,6 +119,6 @@ class Instance {
  private:
   rocksdb::DB *db_;
 };
-}  // namespace swallow
+}  // namespace disgorge
 
-#endif  // SWALLOW_INSTANCE_HPP
+#endif  // disgorge_INSTANCE_HPP
