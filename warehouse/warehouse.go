@@ -15,6 +15,7 @@ import (
 	"math/rand"
 	"os"
 	"path"
+	"reflect"
 	"strconv"
 	"time"
 	"unsafe"
@@ -27,6 +28,17 @@ import (
 const success = "SUCCESS"
 const interval int64 = 3600
 const maxCount = 1000
+
+func str2bytes(s string) (b []byte) {
+	/* #nosec G103 */
+	bh := (*reflect.SliceHeader)(unsafe.Pointer(&b))
+	/* #nosec G103 */
+	sh := (*reflect.StringHeader)(unsafe.Pointer(&s))
+	bh.Data = sh.Data
+	bh.Cap = sh.Len
+	bh.Len = sh.Len
+	return b
+}
 
 func scan(query, start, end string, shard *api.Shard, status bool) []string {
 	stat := prome.NewStat("warehouse.scan")
@@ -47,8 +59,8 @@ func scan(query, start, end string, shard *api.Shard, status bool) []string {
 		secondary = fmt.Sprintf("/tmp/%d-%d", ts, idx)
 	}
 
-	ins := C.disgorge_open(unsafe.Pointer(&shard.Path), C.ulonglong(len(shard.Path)),
-		unsafe.Pointer(&secondary), C.ulonglong(len(secondary)))
+	ins := C.disgorge_open(unsafe.Pointer(&str2bytes(shard.Path)[0]), C.ulonglong(len(shard.Path)),
+		unsafe.Pointer(&str2bytes(secondary)[0]), C.ulonglong(len(secondary)))
 	defer C.disgorge_close(ins)
 
 	if ins == nil {
@@ -63,9 +75,9 @@ func scan(query, start, end string, shard *api.Shard, status bool) []string {
 		startKey = shard.Lastkey
 	}
 
-	resp := C.disgorge_scan(ins, unsafe.Pointer(&query), C.ulonglong(len(query)),
-		unsafe.Pointer(&startKey), C.ulonglong(len(startKey)),
-		unsafe.Pointer(&end), C.ulonglong(len(end)))
+	resp := C.disgorge_scan(ins, unsafe.Pointer(&str2bytes(query)[0]), C.ulonglong(len(query)),
+		unsafe.Pointer(&str2bytes(startKey)[0]), C.ulonglong(len(startKey)),
+		unsafe.Pointer(&str2bytes(end)[0]), C.ulonglong(len(end)))
 	defer C.disgorge_del_response(resp)
 	ret := make([]string, 0, maxCount)
 
