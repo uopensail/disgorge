@@ -186,8 +186,8 @@ func Query(req *api.Request) *api.Response {
 	// do query
 	var startPrefix, endPrefix string
 	if req.UserId != "" {
-		startPrefix = fmt.Sprintf("%s|%d", req.UserId, startTs)
-		endPrefix = fmt.Sprintf("%s|%d", req.UserId, endTs)
+		startPrefix = fmt.Sprintf("%s|%d", req.UserId, req.Start)
+		endPrefix = fmt.Sprintf("%s|%d", req.UserId, req.End+1)
 	}
 
 	resp := &api.Response{
