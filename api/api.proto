@@ -24,7 +24,9 @@ message Request {
   repeated Shard shards = 5;
 }
 
-message Data { repeated string items = 1; }
+message Data {
+  repeated string items = 1;
+}
 
 message Response {
   int32 code = 1;

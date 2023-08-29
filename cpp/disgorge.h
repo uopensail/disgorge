@@ -29,6 +29,8 @@ void *disgorge_scan(void *ins, void *query, unsigned long long qlen,
                     void *start, unsigned long long slen, void *end,
                     unsigned long long elen);
 
+int disgorge_check_query(void *query, unsigned long long len);
+
 unsigned long long disgorge_response_size(void *resp);
 int disgorge_response_more(void *resp);
 const char *disgorge_response_lastkey(void *resp);

@@ -75,11 +75,15 @@ class Instance {
 
   Response *scan(rocksdb::Slice query, rocksdb::Slice start,
                  rocksdb::Slice end) {
-    auto expr = disgorge::parse(query.data(), query.size());
+    std::shared_ptr<query::Boolean> expr = nullptr;
+    try {
+      expr = query::parse(query.data(), query.size());
+    } catch (...) {
+      return nullptr;
+    }
+
     Response *resp = new Response();
-    const rocksdb::Snapshot *sp = db_->GetSnapshot();
     rocksdb::ReadOptions options;
-    options.snapshot = sp;
     if (start.size() > 0) {
       options.iterate_lower_bound = &start;
     }
@@ -98,8 +102,8 @@ class Instance {
     }
     size_t count = 0;
     for (; it->Valid(); it->Next()) {
-      rapidjson::Document doc;
-      doc.Parse(it->value().data(), it->value().size());
+      const json &doc =
+          json::parse(std::string_view{it->value().data(), it->value().size()});
       if (expr->Exec(doc)) {
         resp->data_.emplace_back(
             std::string{it->value().data(), it->value().size()});
@@ -112,7 +116,6 @@ class Instance {
       }
     }
     delete it;
-    db_->ReleaseSnapshot(sp);
     return resp;
   }
 

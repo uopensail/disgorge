@@ -99,9 +99,23 @@ func scan(query, start, end string, shard *api.Shard, status bool) []string {
 	return ret
 }
 
+func Check(query string) bool {
+	status := int(C.disgorge_check_query(unsafe.Pointer(&str2bytes(query)[0]), C.ulonglong(len(query))))
+	return status == 1
+}
+
 func Query(req *api.Request) *api.Response {
 	stat := prome.NewStat("warehouse.Query")
 	defer stat.End()
+
+	if !Check(req.Query) {
+		return &api.Response{
+			Data:   nil,
+			Shards: nil,
+			Code:   404,
+		}
+	}
+
 	workdir := config.AppConf.WorkDir
 	// build dict
 	shardDict := make(map[string]*api.Shard, len(req.Shards))

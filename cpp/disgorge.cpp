@@ -53,6 +53,17 @@ int disgorge_response_more(void *resp) {
   return r->more();
 }
 
+int disgorge_check_query(void *query, unsigned long long len) {
+  if (query == nullptr || len == 0) {
+    return 0;
+  }
+  auto expr = query::parse((const char *)query, len);
+  if (expr == nullptr) {
+    return 0;
+  }
+  return 1;
+}
+
 const char *disgorge_response_lastkey(void *resp) {
   if (resp == nullptr) {
     return 0;

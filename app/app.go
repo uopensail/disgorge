@@ -27,9 +27,9 @@ func (app *App) GRPCAPIRegister(s *grpc.Server) {
 }
 
 func (app *App) RegisterGinRouter(ginEngine *gin.Engine) {
-	ginEngine.POST("/query", app.QueryEchoHandler)
-	ginEngine.GET("/", app.PingEchoHandler)
-	ginEngine.GET("/version", app.VersionEchoHandler)
+	ginEngine.POST("/query", app.QueryHandler)
+	ginEngine.GET("/", app.PingHandler)
+	ginEngine.GET("/version", app.VersionHandler)
 }
 
 func (app *App) Query(ctx context.Context, in *api.Request) (*api.Response, error) {
@@ -39,7 +39,7 @@ func (app *App) Query(ctx context.Context, in *api.Request) (*api.Response, erro
 	return response, nil
 }
 
-func (app *App) QueryEchoHandler(gCtx *gin.Context) {
+func (app *App) QueryHandler(gCtx *gin.Context) {
 	stat := prome.NewStat("App.QueryEchoHandler")
 	defer stat.End()
 	request := &api.Request{}
@@ -55,11 +55,11 @@ func (app *App) QueryEchoHandler(gCtx *gin.Context) {
 	gCtx.JSON(http.StatusOK, response)
 }
 
-func (app *App) PingEchoHandler(gCtx *gin.Context) {
+func (app *App) PingHandler(gCtx *gin.Context) {
 	gCtx.String(200, "PONG")
 }
 
-func (app *App) VersionEchoHandler(gCtx *gin.Context) {
+func (app *App) VersionHandler(gCtx *gin.Context) {
 	gCtx.String(200, __GITHASH__)
 }
 
