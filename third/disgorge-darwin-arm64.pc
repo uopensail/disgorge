@@ -1,0 +1,16 @@
+PCDIR=${pcfiledir}
+
+Name: disgorge
+Description: disgorge
+Version: 1
+
+Cflags: \
+	-I${PCDIR}/disgorge/include
+
+Libs: \
+    ${PCDIR}/lib/darwin/arm64/libdisgorge_static.a \
+	-L/usr/local/lib \
+	-lstdc++ \
+	-lm \
+	-lrocksdb \
+    -lpthread

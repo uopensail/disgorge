@@ -1,10 +1,13 @@
 package warehouse
 
 /*
-#cgo CFLAGS: -I.
-#cgo LDFLAGS: -L. -L/usr/local/lib -L../lib -lrocksdb -ldisgorge -Wl,-rpath,./../lib
-#include "../cpp/disgorge.h"
+#cgo darwin,amd64 pkg-config: ${SRCDIR}/../third/disgorge-darwin-amd64.pc
+#cgo darwin,arm64 pkg-config: ${SRCDIR}/../third/disgorge-darwin-arm64.pc
+#cgo linux,amd64 pkg-config:  ${SRCDIR}/../third/disgorge-linux-amd64.pc
 #include <stdlib.h>
+#include "disgorge.h"
+#include <string.h>
+#include <stdio.h>
 */
 import "C"
 
@@ -99,22 +102,9 @@ func scan(query, start, end string, shard *api.Shard, status bool) []string {
 	return ret
 }
 
-func Check(query string) bool {
-	status := int(C.disgorge_check_query(unsafe.Pointer(&str2bytes(query)[0]), C.ulonglong(len(query))))
-	return status == 1
-}
-
 func Query(req *api.Request) *api.Response {
 	stat := prome.NewStat("warehouse.Query")
 	defer stat.End()
-
-	if !Check(req.Query) {
-		return &api.Response{
-			Data:   nil,
-			Shards: nil,
-			Code:   404,
-		}
-	}
 
 	workdir := config.AppConf.WorkDir
 	// build dict
