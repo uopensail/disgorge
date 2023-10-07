@@ -8,7 +8,7 @@ Cflags: \
 	-I${PCDIR}/disgorge/include
 
 Libs: \
-    ${PCDIR}/lib/darwin/amd64 \
+    -L${PCDIR}/lib/darwin/amd64 \
 	-L/usr/local/lib \
 	-ldisgorge \
 	-lstdc++ \

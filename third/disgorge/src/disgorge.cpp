@@ -2,15 +2,14 @@
 
 #include "instance.hpp"
 
-void *disgorge_open(void *dir, unsigned long long len, void *secondary,
-                    unsigned long long slen) {
+void *disgorge_open(const char* dir, const char* secondary_dir) {
   disgorge::Instance *instance = nullptr;
   try {
-    if (secondary == nullptr || slen == 0) {
-      instance = new disgorge::Instance(std::string((char *)dir, len));
+    if (secondary_dir == nullptr || strlen(secondary_dir) == 0) {
+      instance = new disgorge::Instance(std::string((char *)dir, strlen(dir)));
     } else {
-      instance = new disgorge::Instance(std::string((char *)dir, len),
-                                        std::string((char *)secondary, slen));
+      instance = new disgorge::Instance(std::string((char *)dir, strlen(dir)),
+                                        std::string((char *)secondary_dir, strlen(secondary_dir)));
     }
     return instance;
   } catch (...) {
@@ -28,13 +27,13 @@ void disgorge_close(void *ins) {
 
 void *disgorge_scan(void *ins, void *query, unsigned long long qlen,
                     void *start, unsigned long long slen, void *end,
-                    unsigned long long elen) {
+                    unsigned long long elen, long long max_count) {
   if (ins == nullptr) {
     return nullptr;
   }
   disgorge::Instance *instance = (disgorge::Instance *)ins;
   return instance->scan({(char *)query, qlen}, {(char *)start, slen},
-                        {(char *)end, elen});
+                        {(char *)end, elen}, max_count);
 }
 
 unsigned long long disgorge_response_size(void *resp) {

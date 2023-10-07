@@ -31,7 +31,7 @@
 
 namespace disgorge {
 
-const size_t max_count = 1000;
+ 
 
 class Instance;
 
@@ -74,7 +74,7 @@ class Instance {
   }
 
   Response *scan(rocksdb::Slice query, rocksdb::Slice start,
-                 rocksdb::Slice end) {
+                 rocksdb::Slice end,size_t max_count) {
     std::shared_ptr<query::Boolean> expr = nullptr;
     try {
       expr = query::parse(query.data(), query.size());
@@ -104,11 +104,11 @@ class Instance {
     for (; it->Valid(); it->Next()) {
       const json &doc =
           json::parse(std::string_view{it->value().data(), it->value().size()});
-      if (expr->Exec(doc)) {
+      if (expr == nullptr || expr->Exec(doc)) {
         resp->data_.emplace_back(
             std::string{it->value().data(), it->value().size()});
         count++;
-        if (count >= max_count) {
+        if (max_count >=0 && count >= max_count) {
           resp->more_ = 1;
           resp->lastkey_ = std::string{it->key().data(), it->key().size()};
           break;

@@ -21,13 +21,12 @@
 extern "C" {
 #endif
 
-void *disgorge_open(void *dir, unsigned long long len, void *secondary,
-                    unsigned long long slen);
+void *disgorge_open(const char* dir, const char* secondary_dir);
 void disgorge_close(void *ins);
 
 void *disgorge_scan(void *ins, void *query, unsigned long long qlen,
                     void *start, unsigned long long slen, void *end,
-                    unsigned long long elen);
+                    unsigned long long elen, long long max_count);
 
 int disgorge_check_query(void *query, unsigned long long len);
 

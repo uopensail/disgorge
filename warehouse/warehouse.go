@@ -12,8 +12,8 @@ package warehouse
 import "C"
 
 import (
-	"disgorge/api"
 	"disgorge/config"
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -23,6 +23,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/uopensail/swallow-idl/proto/disgorgeapi"
 	"github.com/uopensail/ulib/prome"
 	"github.com/uopensail/ulib/zlog"
 	"go.uber.org/zap"
@@ -43,27 +44,134 @@ func str2bytes(s string) (b []byte) {
 	return b
 }
 
-func scan(query, start, end string, shard *api.Shard, status bool) []string {
+func FindDbPath(workdir string, startTs, endTs int64) ([]string, []bool) {
+
+	// list dirs
+	files, err := os.ReadDir(workdir)
+	if err != nil {
+
+		zlog.LOG.Error("list dir error", zap.String("workdir", workdir))
+		return nil, nil
+	}
+	var paths []string
+	var asSecondary []bool
+	// filter and list the shards and open status
+	for i := 0; i < len(files); i++ {
+		if !files[i].IsDir() {
+			continue
+		}
+
+		ip := files[i].Name()
+		ipPath := path.Join(workdir, ip)
+		subFiles, err := os.ReadDir(ipPath)
+		if err != nil {
+			continue
+		}
+
+		for j := 0; j < len(subFiles); j++ {
+			if !subFiles[j].IsDir() {
+				continue
+			}
+
+			ts, err := strconv.ParseInt(subFiles[j].Name(), 10, 64)
+			if err != nil {
+				continue
+			}
+
+			if !((ts <= startTs && startTs <= ts+interval) ||
+				(ts <= endTs && endTs <= ts+interval)) {
+				continue
+			}
+
+			shardPath := path.Join(ipPath, subFiles[j].Name())
+
+			paths = append(paths, shardPath)
+			if _, err := os.Stat(path.Join(ipPath, subFiles[j].Name(), success)); os.IsNotExist(err) {
+				asSecondary = append(asSecondary, true)
+			} else {
+				asSecondary = append(asSecondary, false)
+			}
+		}
+	}
+	return paths, asSecondary
+}
+func FetchAll(filterQL, startPrefix, endPrefix string, paths []string, asSecondarys []bool) []string {
+	var vvs []string
+	for i := 0; i < len(paths); i++ {
+		vv, _ := FetchSingleAll("", startPrefix, endPrefix, paths[i], asSecondarys[i])
+		vvs = append(vvs, vv...)
+	}
+	return vvs
+}
+func FetchSingleAll(filterQL, startPrefix, endPrefix, path string, asSecondary bool) ([]string, error) {
+	secondary := ""
+	if asSecondary {
+		ts := time.Now().UnixNano()
+		idx := rand.Int63n(1000000)
+		secondary = fmt.Sprintf("/tmp/%d-%d", ts, idx)
+	}
+	dirCString := C.CString(path)
+	defer C.free(unsafe.Pointer(dirCString))
+
+	secondaryCString := C.CString(secondary)
+	defer C.free(unsafe.Pointer(secondaryCString))
+	ins := C.disgorge_open(dirCString, secondaryCString)
+
+	defer C.disgorge_close(ins)
+
+	if ins == nil {
+
+		zlog.LOG.Error("fail to open rocksdb", zap.String("path", path))
+		return nil, errors.New("fail to open rocksdb")
+	}
+
+	startKey := startPrefix
+	var filterPointer unsafe.Pointer
+	if len(filterQL) > 0 {
+		filterPointer = unsafe.Pointer(&str2bytes(filterQL)[0])
+	}
+	resp := C.disgorge_scan(ins, filterPointer, C.ulonglong(len(filterQL)),
+		unsafe.Pointer(&str2bytes(startKey)[0]), C.ulonglong(len(startKey)),
+		unsafe.Pointer(&str2bytes(endPrefix)[0]), C.ulonglong(len(endPrefix)), C.longlong(-1))
+
+	defer C.disgorge_del_response(resp)
+	ret := make([]string, 0, maxCount)
+
+	size := uint64(C.disgorge_response_size(resp))
+
+	for i := uint64(0); i < size; i++ {
+		ptr := C.disgorge_response_value(resp, C.ulonglong(i))
+		ret = append(ret, C.GoString(ptr))
+	}
+	return ret, nil
+}
+
+func scan(filterQL, start, end string, shard *disgorgeapi.Shard, status bool) []string {
 	stat := prome.NewStat("warehouse.scan")
 	defer stat.End()
-	if shard == nil || shard.Status == api.ShardStatus_Finished ||
-		shard.Status == api.ShardStatus_Error ||
+	if shard == nil || shard.Status == disgorgeapi.ShardStatus_Finished ||
+		shard.Status == disgorgeapi.ShardStatus_Error ||
 		(!shard.HasMore) {
 		zlog.LOG.Info("shard status check fail")
 		return nil
 	}
 
-	shard.Status = api.ShardStatus_InProgress
+	shard.Status = disgorgeapi.ShardStatus_InProgress
 	secondary := ""
 
 	if status {
-		ts := time.Now().Unix()
+		ts := time.Now().UnixNano()
 		idx := rand.Int63n(1000000)
 		secondary = fmt.Sprintf("/tmp/%d-%d", ts, idx)
 	}
 
-	ins := C.disgorge_open(unsafe.Pointer(&str2bytes(shard.Path)[0]), C.ulonglong(len(shard.Path)),
-		unsafe.Pointer(&str2bytes(secondary)[0]), C.ulonglong(len(secondary)))
+	dirCString := C.CString(shard.Path)
+	defer C.free(unsafe.Pointer(dirCString))
+
+	secondaryCString := C.CString(secondary)
+	defer C.free(unsafe.Pointer(secondaryCString))
+	ins := C.disgorge_open(dirCString, secondaryCString)
+
 	defer C.disgorge_close(ins)
 
 	if ins == nil {
@@ -77,10 +185,13 @@ func scan(query, start, end string, shard *api.Shard, status bool) []string {
 	if len(shard.Lastkey) > 0 {
 		startKey = shard.Lastkey
 	}
-
-	resp := C.disgorge_scan(ins, unsafe.Pointer(&str2bytes(query)[0]), C.ulonglong(len(query)),
+	var filterPointer unsafe.Pointer
+	if len(filterQL) > 0 {
+		filterPointer = unsafe.Pointer(&str2bytes(filterQL)[0])
+	}
+	resp := C.disgorge_scan(ins, filterPointer, C.ulonglong(len(filterQL)),
 		unsafe.Pointer(&str2bytes(startKey)[0]), C.ulonglong(len(startKey)),
-		unsafe.Pointer(&str2bytes(end)[0]), C.ulonglong(len(end)))
+		unsafe.Pointer(&str2bytes(end)[0]), C.ulonglong(len(end)), C.longlong(30))
 	defer C.disgorge_del_response(resp)
 	ret := make([]string, 0, maxCount)
 
@@ -90,7 +201,7 @@ func scan(query, start, end string, shard *api.Shard, status bool) []string {
 	} else {
 		shard.HasMore = false
 		shard.Lastkey = ""
-		shard.Status = api.ShardStatus_Finished
+		shard.Status = disgorgeapi.ShardStatus_Finished
 	}
 
 	size := uint64(C.disgorge_response_size(resp))
@@ -102,20 +213,20 @@ func scan(query, start, end string, shard *api.Shard, status bool) []string {
 	return ret
 }
 
-func Query(req *api.Request) *api.Response {
+func Query(req *disgorgeapi.Request) *disgorgeapi.Response {
 	stat := prome.NewStat("warehouse.Query")
 	defer stat.End()
 
-	workdir := config.AppConf.WorkDir
+	workdir := config.AppConfigInstance.WorkDir
 	// build dict
-	shardDict := make(map[string]*api.Shard, len(req.Shards))
+	shardDict := make(map[string]*disgorgeapi.Shard, len(req.Shards))
 	for i := 0; i < len(req.Shards); i++ {
 		shardDict[req.Shards[i].Path] = req.Shards[i]
 	}
 
 	startTs := req.Start - 10
 	endTs := req.End + 10
-	shards := make([]*api.Shard, 0)
+	shards := make([]*disgorgeapi.Shard, 0)
 	status := make([]bool, 0)
 
 	// list dirs
@@ -157,8 +268,8 @@ func Query(req *api.Request) *api.Response {
 			shardPath := path.Join(ipPath, subFiles[j].Name())
 			shard, ok := shardDict[shardPath]
 			if !ok {
-				shard = &api.Shard{
-					Status:  api.ShardStatus_NotStarted,
+				shard = &disgorgeapi.Shard{
+					Status:  disgorgeapi.ShardStatus_NotStarted,
 					Path:    shardPath,
 					HasMore: true,
 					Lastkey: "",
@@ -180,8 +291,8 @@ func Query(req *api.Request) *api.Response {
 		endPrefix = fmt.Sprintf("%s|%d", req.UserId, req.End+1)
 	}
 
-	resp := &api.Response{
-		Data:   make([]*api.Data, len(shards)),
+	resp := &disgorgeapi.Response{
+		Data:   make([]*disgorgeapi.Data, len(shards)),
 		Shards: shards,
 		Code:   200,
 	}
@@ -189,18 +300,18 @@ func Query(req *api.Request) *api.Response {
 	count := 0
 
 	for i := 0; i < len(shards); i++ {
-		if shards[i].Status == api.ShardStatus_Error ||
-			shards[i].Status == api.ShardStatus_Finished {
+		if shards[i].Status == disgorgeapi.ShardStatus_Error ||
+			shards[i].Status == disgorgeapi.ShardStatus_Finished {
 			continue
 		}
-		resp.Data[i] = &api.Data{
+		resp.Data[i] = &disgorgeapi.Data{
 			Items: make([]string, 0, maxCount),
 		}
 
 		items := scan(req.Query, startPrefix, endPrefix, shards[i], status[i])
 		resp.Data[i].Items = append(resp.Data[i].Items, items...)
 		count += len(items)
-		if count >= maxCount {
+		if maxCount >= 0 && count >= maxCount {
 			break
 		}
 	}
